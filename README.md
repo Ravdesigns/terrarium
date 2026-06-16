@@ -13,7 +13,7 @@ built with three.js. the only server-side piece is a tiny fetch proxy
 (`/api/raw`) that reads a site's HTML so the browser can (it's otherwise
 CORS-blocked), with an SSRF guard, an 8s timeout, and a 500 KB cap.
 
-**Live → [terrarium-flax.vercel.app](https://terrarium-flax.vercel.app)** <!-- updated after deploy -->
+**Live → [terrarium-mu.vercel.app](https://terrarium-mu.vercel.app)**
 
 ## Run locally
 
