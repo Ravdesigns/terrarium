@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>terrarium · grow a plant from any website</title>
+<meta name="description" content="Paste a website. Watch a one-of-a-kind plant grow from its DNA — colours, fonts, weight, speed." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --ink:#28342a; --ink-soft:#5b6b5c; --ink-faint:#8a9a8b;
+    --cream:#f6efe2; --sage:#d6e2cf;
+    --moss:#3f7d4e; --moss-deep:#2c5c39; --leaf:#6aa86a;
+    --glass:rgba(255,255,255,.5); --glass-line:rgba(63,125,78,.16);
+    --shadow:0 12px 40px -12px rgba(44,92,57,.28);
+    --serif:"Fraunces",Georgia,serif;
+    --sans:"Inter",system-ui,-apple-system,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; font-family:var(--sans); color:var(--ink);
+    background:linear-gradient(180deg,#f6efe2 0%,#eef0e0 45%,#d6e2cf 100%);
+    overflow:hidden; -webkit-font-smoothing:antialiased;
+  }
+  canvas{display:block; position:fixed; inset:0}
+
+  /* ---- chrome ---- */
+  .wordmark{
+    position:fixed; top:26px; left:30px; z-index:6; user-select:none;
+  }
+  .wordmark b{
+    font-family:var(--serif); font-weight:500; font-size:23px; letter-spacing:-.02em;
+    color:var(--ink); display:block; line-height:1;
+  }
+  .wordmark span{
+    font-size:11.5px; color:var(--ink-faint); letter-spacing:.14em; text-transform:uppercase;
+    display:block; margin-top:5px;
+  }
+  .leaf-dot{display:inline-block; width:7px; height:7px; border-radius:0 60% 60% 60%;
+    background:var(--moss); transform:rotate(45deg); margin-right:7px; vertical-align:middle}
+
+  /* ---- gate card ---- */
+  .scrim{
+    position:fixed; inset:0; z-index:10; display:grid; place-items:center; padding:24px;
+    background:radial-gradient(120% 80% at 50% 30%,rgba(246,239,226,.2),rgba(214,226,207,.55));
+    backdrop-filter:blur(2px); transition:opacity .6s ease;
+  }
+  .card{
+    width:min(440px,92vw); background:rgba(255,255,255,.72); backdrop-filter:blur(18px);
+    border:1px solid rgba(255,255,255,.7); border-radius:22px; padding:30px 30px 26px;
+    box-shadow:var(--shadow); text-align:center;
+  }
+  .card .eyebrow{font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--moss); font-weight:600}
+  .card h1{font-family:var(--serif); font-weight:500; font-size:30px; line-height:1.12; margin:12px 0 8px; letter-spacing:-.02em}
+  .card p{margin:0 0 20px; color:var(--ink-soft); font-size:14.5px; line-height:1.5}
+  .field{display:flex; gap:8px; align-items:center; background:#fff; border:1px solid var(--glass-line);
+    border-radius:14px; padding:6px 6px 6px 16px; box-shadow:inset 0 1px 2px rgba(44,92,57,.05)}
+  .field:focus-within{border-color:var(--moss); box-shadow:0 0 0 3px rgba(63,125,78,.12)}
+  .field svg{flex:0 0 auto; opacity:.5}
+  .field input{flex:1; border:0; outline:0; font:inherit; font-size:15px; color:var(--ink); background:transparent; min-width:0}
+  .field input::placeholder{color:var(--ink-faint)}
+  .grow{flex:0 0 auto; border:0; cursor:pointer; font:inherit; font-weight:600; font-size:14px; color:#fff;
+    background:var(--moss); padding:11px 18px; border-radius:10px; display:inline-flex; align-items:center; gap:7px;
+    transition:background .15s ease, transform .15s ease}
+  .grow:hover{background:var(--moss-deep)} .grow:active{transform:scale(.97)}
+  .grow .arr{display:grid; place-items:center; width:16px; height:16px}
+  .chips{display:flex; flex-wrap:wrap; gap:7px; justify-content:center; margin-top:18px}
+  .chips .lab{width:100%; font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:2px}
+  .chip{border:1px solid var(--glass-line); background:rgba(255,255,255,.6); color:var(--ink-soft);
+    font-size:12.5px; padding:6px 12px; border-radius:999px; cursor:pointer; transition:all .15s ease; font-family:var(--sans)}
+  .chip:hover{border-color:var(--moss); color:var(--moss); background:#fff}
+  .err{color:#b4533b; font-size:12.5px; margin-top:12px; min-height:1em; transition:opacity .2s}
+  .privacy{margin-top:16px; font-size:11px; color:var(--ink-faint); line-height:1.4}
+
+  /* ---- germination loader ---- */
+  .germ{display:none; flex-direction:column; align-items:center; gap:18px}
+  .germ.on{display:flex}
+  .sprout{width:52px; height:52px}
+  .sprout .stem{stroke:var(--moss); stroke-width:3; stroke-linecap:round; fill:none;
+    stroke-dasharray:60; stroke-dashoffset:60; animation:draw 1.3s ease forwards}
+  .sprout .lf{fill:var(--leaf); transform-origin:26px 30px; transform:scale(0); animation:pop .5s ease forwards}
+  .sprout .lf.l2{animation-delay:.55s} .sprout .lf.l1{animation-delay:.8s}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  @keyframes pop{to{transform:scale(1)}}
+  .germ .stage{font-size:13.5px; color:var(--ink-soft); letter-spacing:.02em}
+  .germ .host{font-family:var(--serif); font-size:17px; color:var(--ink)}
+
+  /* ---- DNA legend ---- */
+  .dna{position:fixed; top:0; right:0; height:100%; width:312px; z-index:5; padding:26px 26px 26px;
+    display:flex; flex-direction:column; pointer-events:none; opacity:0; transform:translateX(14px);
+    transition:opacity .7s ease .2s, transform .7s ease .2s}
+  .dna.on{opacity:1; transform:none}
+  .dna .panel{margin-top:auto; background:rgba(255,255,255,.66); backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,.7); border-radius:18px; padding:18px 18px 14px; box-shadow:var(--shadow); pointer-events:auto}
+  .dna .head{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:3px}
+  .dna .head h2{font-family:var(--serif); font-weight:500; font-size:18px; margin:0; letter-spacing:-.01em;
+    max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .dna .head .sp{font-size:11px; color:var(--ink-faint)}
+  .dna .sub{font-size:12px; color:var(--ink-soft); margin:0 0 13px; line-height:1.4}
+  .row{display:grid; grid-template-columns:18px 1fr auto; gap:9px; align-items:center; padding:7px 0;
+    border-top:1px solid rgba(63,125,78,.1)}
+  .row .ic{font-size:14px; text-align:center; opacity:.9}
+  .row .tx{display:flex; flex-direction:column; gap:1px}
+  .row .tx b{font-size:12.5px; font-weight:550; color:var(--ink)}
+  .row .tx small{font-size:10.5px; color:var(--ink-faint); letter-spacing:.01em}
+  .row .vl{font-size:12px; color:var(--moss-deep); font-weight:600; text-align:right; white-space:nowrap}
+  .sw{display:flex; gap:3px; justify-content:flex-end}
+  .sw i{width:13px; height:13px; border-radius:4px; display:block; box-shadow:inset 0 0 0 1px rgba(0,0,0,.07)}
+
+  /* ---- footer bar ---- */
+  .bar{position:fixed; left:30px; bottom:26px; z-index:5; display:flex; align-items:center; gap:14px;
+    opacity:0; transform:translateY(8px); transition:opacity .6s ease .3s, transform .6s ease .3s}
+  .bar.on{opacity:1; transform:none}
+  .bar .again{border:1px solid var(--glass-line); background:rgba(255,255,255,.7); backdrop-filter:blur(10px);
+    color:var(--ink); font:inherit; font-size:13px; font-weight:500; padding:9px 15px; border-radius:999px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:7px; transition:all .15s ease}
+  .bar .again:hover{border-color:var(--moss); color:var(--moss)}
+  .bar .hint{font-size:11.5px; color:var(--ink-faint)}
+
+  @media (max-width:720px){
+    .wordmark{top:14px; left:16px} .wordmark span{display:none}
+    .dna{width:100%; height:auto; top:auto; bottom:0; padding:0}
+    .dna .panel{margin:0; max-height:46vh; overflow:auto; border-radius:18px 18px 0 0;
+      -webkit-overflow-scrolling:touch}
+    .bar{left:14px; bottom:auto; top:60px}
+    .bar .hint{display:none}
+    .card{padding:24px 22px 22px}
+  }
+</style>
+</head>
+<body>
+
+<div class="wordmark"><b><span class="leaf-dot"></span>terrarium</b><span>websites, growing</span></div>
+
+<!-- DNA legend -->
+<aside class="dna" id="dna">
+  <div class="panel">
+    <div class="head"><h2 id="dnaHost">—</h2><span class="sp" id="dnaSp">specimen</span></div>
+    <p class="sub" id="dnaSub">Every plant is grown from the site's own traits.</p>
+    <div id="dnaRows"></div>
+  </div>
+</aside>
+
+<!-- footer -->
+<div class="bar" id="bar">
+  <button class="again" id="again"><span>↺</span> plant another</button>
+  <span class="hint">drag to look around · scroll to zoom</span>
+</div>
+
+<!-- gate -->
+<div class="scrim" id="scrim">
+  <div class="card">
+    <div id="gate">
+      <div class="eyebrow">a living portrait of the web</div>
+      <h1>Plant a website.</h1>
+      <p>Paste any URL. We read the site's DNA — its colours, type, weight and speed — and grow a one-of-a-kind plant from it.</p>
+      <form class="field" id="form">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>
+        <input id="url" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="stripe.com" aria-label="website url" />
+        <button class="grow" type="submit">grow<span class="arr">→</span></button>
+      </form>
+      <div class="chips">
+        <span class="lab">or try one</span>
+        <button class="chip" data-u="stripe.com">stripe.com</button>
+        <button class="chip" data-u="nasa.gov">nasa.gov</button>
+        <button class="chip" data-u="github.com">github.com</button>
+        <button class="chip" data-u="bbc.com">bbc.com</button>
+        <button class="chip" data-u="wikipedia.org">wikipedia.org</button>
+      </div>
+      <div class="err" id="err"></div>
+      <p class="privacy">Nothing is stored. The site is fetched once to read its public markup, then forgotten.</p>
+    </div>
+
+    <div class="germ" id="germ">
+      <svg class="sprout" viewBox="0 0 52 56">
+        <path class="stem" d="M26 54 C26 40 26 34 26 22"/>
+        <path class="lf l2" d="M26 30 C16 28 11 22 12 14 C21 15 27 21 26 30Z"/>
+        <path class="lf l1" d="M26 26 C36 24 41 18 40 10 C31 11 25 17 26 26Z"/>
+      </svg>
+      <div class="host" id="germHost">…</div>
+      <div class="stage" id="germStage">reaching out…</div>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./lib/three.module.js",
+    "three/addons/": "./lib/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+/* ============================================================ utils */
+const $ = (s) => document.querySelector(s);
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+function hashStr(s){ let h = 2166136261 >>> 0; for (let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+/* ============================================================ DNA: read a site's markup */
+async function fetchSite(rawUrl){
+  let u = rawUrl.trim(); if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+  // prod: our serverless proxy. local/dev fallback: a public CORS reader.
+  try {
+    const r = await fetch('/api/raw?url=' + encodeURIComponent(u));
+    if (r.ok) { const j = await r.json(); if (j && j.ok && j.html) return j; if (j && !j.ok) throw new Error(j.error || 'unreachable'); }
+    throw new Error('noapi');
+  } catch (e) {
+    if (e && e.message && e.message !== 'noapi') { /* real reachability error from api */ }
+    // fallback (works on a plain static server)
+    const t0 = performance.now();
+    const r2 = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(u));
+    if (!r2.ok) throw new Error('could not reach site');
+    const j2 = await r2.json();
+    const html = (j2 && j2.contents) || '';
+    if (!html) throw new Error('could not reach site');
+    return { ok:true, finalUrl: (j2.status && j2.status.url) || u, https: u.startsWith('https'),
+      ms: Math.round(performance.now() - t0), bytes: html.length, html };
+  }
+}
+
+function parseHexish(tok){
+  tok = tok.trim().toLowerCase();
+  let m = tok.match(/^#([0-9a-f]{3})$/); if (m){ const h=m[1]; return new THREE.Color('#'+h[0]+h[0]+h[1]+h[1]+h[2]+h[2]); }
+  m = tok.match(/^#([0-9a-f]{6})$/); if (m) return new THREE.Color(tok);
+  m = tok.match(/^rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/i);
+  if (m) return new THREE.Color(+m[1]/255, +m[2]/255, +m[3]/255);
+  return null;
+}
+
+function readDNA(site){
+  const html = site.html || '';
+  const lower = html.toLowerCase();
+  const grab = (re) => { const m = html.match(re); return m ? m[1].trim() : ''; };
+
+  // meta
+  const title = (grab(/<title[^>]*>([\s\S]*?)<\/title>/i) || '').replace(/\s+/g,' ').slice(0,90);
+  const metaOf = (key) => {
+    const re = new RegExp('<meta[^>]+(?:name|property)\\s*=\\s*["\']' + key + '["\'][^>]*>', 'i');
+    const tag = html.match(re); if (!tag) return '';
+    const c = tag[0].match(/content\s*=\s*["']([^"']*)["']/i); return c ? c[1].trim() : '';
+  };
+  const description = metaOf('description').slice(0,160);
+  const themeColor = metaOf('theme-color');
+  const ogImage = metaOf('og:image');
+
+  // colours — tally everything that looks like a colour in inline styles / <style>
+  const tally = new Map();
+  const add = (c) => { if(!c) return; const k = '#'+c.getHexString(); tally.set(k, (tally.get(k)||0)+1); };
+  add(parseHexish(themeColor));
+  (html.match(/#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g) || []).forEach(h => add(parseHexish(h)));
+  (html.match(/rgba?\([^)]+\)/gi) || []).forEach(h => add(parseHexish(h)));
+
+  // fonts
+  const famRaw = (html.match(/font-family\s*:\s*([^;}"'<]+)/gi) || [])
+    .map(s => s.replace(/font-family\s*:\s*/i,'').split(',')[0].replace(/["']/g,'').trim().toLowerCase())
+    .filter(f => f && !/^(inherit|initial|var\(|unset)/.test(f));
+  const googleFonts = (html.match(/fonts\.googleapis\.com\/css2?\?family=([^"'&]+)/gi) || [])
+    .map(s => decodeURIComponent(s.split('family=')[1].split(':')[0]).replace(/\+/g,' ').toLowerCase());
+  const families = Array.from(new Set([...famRaw, ...googleFonts])).slice(0, 40);
+  const blob = (families.join(' ') + ' ' + lower.slice(0, 4000));
+  const isMono = /\b(mono|consolas|courier|menlo|roboto mono|jetbrains|source code)\b/.test(blob);
+  const hasSerif = /\b(serif|georgia|garamond|times|playfair|fraunces|merriweather|lora|freight|tiempos|canela|noto serif)\b/.test(blob) && !/sans-serif/.test(families.join(','));
+  const fontClass = isMono ? 'mono' : (hasSerif ? 'serif' : 'sans');
+
+  // structure
+  const tagCount    = (html.match(/<[a-z][a-z0-9-]*[\s>\/]/gi) || []).length;
+  const linkCount   = (html.match(/<a\b/gi) || []).length;
+  const imgCount    = (html.match(/<img\b/gi) || []).length;
+  const scriptCount = (html.match(/<script\b/gi) || []).length;
+
+  let host = '';
+  try { host = new URL(site.finalUrl).hostname.replace(/^www\./,''); } catch { host = site.finalUrl; }
+
+  return {
+    host, title, description, themeColor, ogImage,
+    colors: Array.from(tally.entries()).map(([hex,count]) => ({ hex, count })),
+    families, fontClass, tagCount, linkCount, imgCount, scriptCount,
+    https: !!site.https, ms: site.ms || 0, bytes: site.bytes || 0,
+  };
+}
+
+/* ----- turn DNA into plant genetics ----- */
+function chroma(c){ const hsl={}; c.getHSL(hsl); return hsl; } // {h,s,l}
+function genetics(dna){
+  const seed = hashStr(dna.host || dna.title || 'seed');
+  const rng = mulberry32(seed || 1);
+
+  // palette: prefer the site's own saturated colours; else derive from the seed
+  const parsed = dna.colors.map(c => { const col = new THREE.Color(c.hex); const h = chroma(col); return { col, ...h, count:c.count }; });
+  const accents = parsed
+    .filter(p => p.s > 0.28 && p.l > 0.18 && p.l < 0.88)
+    .sort((a,b) => b.count*b.s - a.count*a.s);
+  const dedupHue = [];
+  for (const p of accents){ if (!dedupHue.some(q => Math.abs(q.h - p.h) < 0.05)) dedupHue.push(p); if (dedupHue.length>=3) break; }
+  let flowerCols = dedupHue.map(p => p.col);
+  if (flowerCols.length === 0){ // seeded fallback palette
+    const baseH = rng();
+    flowerCols = [0, 0.5, 0.85].map(o => new THREE.Color().setHSL((baseH+o)%1, 0.6, 0.58));
+  }
+  // leaf tint: lean green, nudged toward the site's dominant hue
+  const domHue = dedupHue.length ? dedupHue[0].h : rng();
+  const leafBase = new THREE.Color().setHSL(0.30, 0.56, 0.4).lerp(new THREE.Color().setHSL(domHue,0.45,0.45), 0.16);
+
+  const vigor = clamp(1 - (dna.ms - 250) / 3200, 0.18, 1);          // fast site → vigorous
+  const lush  = clamp(Math.log10(dna.linkCount + 6) / 2.5, 0.25, 1);// links → leaf density
+  const sizeF = clamp(Math.log10(dna.bytes + 1500) / 5.6, 0.35, 1.1);// bytes → height
+  const bushF = clamp(Math.log10(dna.tagCount + 30) / 3.7, 0.3, 1); // tags → branchiness
+  const chaos = clamp(dna.scriptCount / 45, 0.08, 0.85);           // scripts → wild spread
+
+  return {
+    rng, seed, flowerCols, leafBase, vigor, lush, sizeF, bushF, chaos,
+    maxDepth: Math.round(lerp(3, 5.4, bushF)),
+    children: () => (rng() < lerp(0.15, 0.7, chaos) ? 3 : 2),
+    spread: lerp(0.34, 0.72, chaos),
+    decay: lerp(0.82, 0.72, bushF),
+    baseLen: lerp(0.62, 1.2, sizeF),
+    baseRad: lerp(0.05, 0.085, sizeF),
+    leafScale: dna.fontClass === 'serif' ? 1.22 : dna.fontClass === 'mono' ? 0.7 : 1.0,
+    leafNarrow: dna.fontClass === 'mono' ? 0.45 : dna.fontClass === 'serif' ? 1.25 : 0.85,
+    flowerBudget: clamp(Math.round(dna.imgCount * 0.6), dna.imgCount > 0 ? 1 : 0, 16),
+    droop: (1 - vigor) * 0.5,
+    healthy: dna.https,
+  };
+}
+
+/* ============================================================ three scene */
+const scene = new THREE.Scene();
+
+function gradientTex(stops){
+  const c = document.createElement('canvas'); c.width = 4; c.height = 256;
+  const g = c.getContext('2d'); const grd = g.createLinearGradient(0,0,0,256);
+  stops.forEach(([o,col]) => grd.addColorStop(o, col)); g.fillStyle = grd; g.fillRect(0,0,4,256);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+}
+scene.background = gradientTex([[0,'#f7f0e3'],[0.5,'#eef0e0'],[1,'#cfdec8']]);
+
+const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 0.1, 200);
+camera.position.set(0.2, 2.4, 8.4);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.92;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// soft IBL
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+// lights
+scene.add(new THREE.HemisphereLight(0xfff4e2, 0x8fa07d, 0.4));
+const key = new THREE.DirectionalLight(0xfff1da, 1.0);
+key.position.set(-5, 9, 6); key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -0.0008;
+key.shadow.camera.near = 1; key.shadow.camera.far = 30;
+key.shadow.camera.left = -6; key.shadow.camera.right = 6; key.shadow.camera.top = 8; key.shadow.camera.bottom = -2;
+scene.add(key);
+const fill = new THREE.DirectionalLight(0xdfeeff, 0.22); fill.position.set(5, 3, -4); scene.add(fill);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2.0, 0);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.enablePan = false; controls.minDistance = 4.5; controls.maxDistance = 13;
+controls.minPolarAngle = 0.5; controls.maxPolarAngle = 1.72;
+controls.autoRotate = true; controls.autoRotateSpeed = 0.55;
+
+/* ----- the shelf, the soil, the glass ----- */
+const GLOBE_C = new THREE.Vector3(0, 2.0, 0);
+const GLOBE_R = 2.35;
+const SOIL_Y = 0.42; // planting surface
+
+// wooden shelf
+const shelf = new THREE.Mesh(
+  new THREE.CylinderGeometry(3.0, 3.15, 0.34, 64),
+  new THREE.MeshStandardMaterial({ color: 0x6e4f33, roughness: 0.85, metalness: 0 }));
+shelf.position.y = -0.17; shelf.receiveShadow = true; scene.add(shelf);
+
+// brass base ring under the globe
+const ring = new THREE.Mesh(
+  new THREE.TorusGeometry(1.55, 0.085, 16, 80),
+  new THREE.MeshStandardMaterial({ color: 0xc9a24b, roughness: 0.35, metalness: 0.9 }));
+ring.rotation.x = Math.PI/2; ring.position.y = 0.04; ring.castShadow = true; scene.add(ring);
+
+// soil mound (clipped to a disc by scaling a sphere flat)
+const soil = new THREE.Mesh(
+  new THREE.SphereGeometry(1.5, 48, 24),
+  new THREE.MeshStandardMaterial({ color: 0x3a2a1d, roughness: 1 }));
+soil.scale.set(1, 0.34, 1); soil.position.y = SOIL_Y - 0.46; soil.receiveShadow = true; soil.castShadow = false;
+scene.add(soil);
+// pebbles + moss specks on the soil
+const pebbleMat = new THREE.MeshStandardMaterial({ color: 0x9a9384, roughness: 0.9 });
+const mossMat = new THREE.MeshStandardMaterial({ color: 0x5c8a4a, roughness: 1 });
+(() => {
+  const rng = mulberry32(99);
+  for (let i=0;i<22;i++){
+    const a = rng()*6.28, rr = 0.4 + rng()*1.0;
+    const moss = rng() < 0.55;
+    const m = new THREE.Mesh(new THREE.SphereGeometry(moss ? 0.13+rng()*0.1 : 0.07+rng()*0.06, 8, 6),
+      moss ? mossMat : pebbleMat);
+    m.position.set(Math.cos(a)*rr, SOIL_Y - 0.02, Math.sin(a)*rr);
+    m.scale.y = moss ? 0.4 : 0.7; m.receiveShadow = true; scene.add(m);
+  }
+})();
+
+// glass globe
+const glass = new THREE.Mesh(
+  new THREE.SphereGeometry(GLOBE_R, 64, 48),
+  new THREE.MeshPhysicalMaterial({
+    color: 0xf2f8f2, metalness: 0, roughness: 0.025, transmission: 1, thickness: 0.4,
+    ior: 1.45, transparent: true, opacity: 1, clearcoat: 0.18, clearcoatRoughness: 0.08,
+    attenuationColor: new THREE.Color(0xcfe6d2), attenuationDistance: 5,
+    envMapIntensity: 0.5, side: THREE.FrontSide,
+  }));
+glass.position.copy(GLOBE_C); scene.add(glass);
+// faint contact shadow disc under the globe
+const cshadow = new THREE.Mesh(new THREE.CircleGeometry(1.7, 48),
+  new THREE.MeshBasicMaterial({ color: 0x2c5c39, transparent: true, opacity: 0.16 }));
+cshadow.rotation.x = -Math.PI/2; cshadow.position.y = 0.02; scene.add(cshadow);
+
+// floating spores inside the globe
+const spores = (() => {
+  const N = 90, pos = new Float32Array(N*3), vel = new Float32Array(N);
+  const rng = mulberry32(7);
+  for (let i=0;i<N;i++){
+    const r = rng()*1.7, t = rng()*6.28, p = Math.acos(2*rng()-1);
+    pos[i*3]   = r*Math.sin(p)*Math.cos(t);
+    pos[i*3+1] = GLOBE_C.y + (rng()*2-1)*1.8;
+    pos[i*3+2] = r*Math.sin(p)*Math.sin(t);
+    vel[i] = 0.04 + rng()*0.08;
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const m = new THREE.PointsMaterial({ color: 0xfff6d8, size: 0.035, transparent: true, opacity: 0.6, depthWrite: false, blending: THREE.AdditiveBlending });
+  const pts = new THREE.Points(g, m); pts.userData.vel = vel; scene.add(pts); return pts;
+})();
+
+/* ----- plant builder ----- */
+const plant = new THREE.Group(); scene.add(plant);
+const UP = new THREE.Vector3(0,1,0);
+
+// shared geometries
+const branchGeo = new THREE.CylinderGeometry(0.62, 1.0, 1, 6, 1, false); branchGeo.translate(0, 0.5, 0);
+const leafShape = (() => {
+  const s = new THREE.Shape();
+  s.moveTo(0, 0); s.bezierCurveTo(0.22, 0.28, 0.2, 0.78, 0, 1.05); s.bezierCurveTo(-0.2, 0.78, -0.22, 0.28, 0, 0);
+  const g = new THREE.ShapeGeometry(s, 8); g.translate(0, 0, 0); return g;
+})();
+const flowerGeo = new THREE.SphereGeometry(1, 12, 10);
+
+let disposables = [];
+function clearPlant(){
+  for (const o of plant.children.slice()) { plant.remove(o); }
+  disposables.forEach(d => { try { d.dispose(); } catch {} }); disposables = [];
+}
+
+function buildPlant(gen){
+  clearPlant();
+  const { rng } = gen;
+  const branches = [];   // {origin, dir, len, rad, depth}
+  const leaves = [];     // {pos, quat, scale, color}
+  const flowers = [];     // {pos, scale, colIdx}
+  const tmpQ = new THREE.Quaternion();
+  const flowerSlots = [];
+
+  function foliage(tip, dir, depth){
+    // a little cluster of leaves around a tip
+    const n = Math.round(lerp(1, 5, gen.lush) * (depth/gen.maxDepth) ) + 1;
+    for (let i=0;i<n && leaves.length < 420; i++){
+      const ax = new THREE.Vector3(rng()*2-1, rng()*0.6, rng()*2-1).normalize();
+      const ld = dir.clone().applyAxisAngle(ax, lerp(0.5, 1.3, rng())).normalize();
+      ld.y -= gen.droop * 0.8; ld.normalize();
+      const q = new THREE.Quaternion().setFromUnitVectors(UP, ld);
+      q.multiply(tmpQ.setFromAxisAngle(new THREE.Vector3(0,1,0), rng()*6.28));
+      const sc = (0.32 + rng()*0.3) * gen.leafScale;
+      const col = gen.leafBase.clone();
+      col.offsetHSL((rng()-0.5)*0.04, (rng()-0.5)*0.12, (rng()-0.5)*0.12 + (gen.healthy?0:-0.06));
+      if (!gen.healthy) col.offsetHSL(-0.06, -0.05, 0); // http → slightly yellowed
+      leaves.push({ pos: tip.clone().addScaledVector(ld, sc*0.4), quat: q, scale: sc, narrow: gen.leafNarrow, color: col });
+    }
+    if (gen.flowerBudget > 0 && flowerSlots.length < gen.flowerBudget*3) flowerSlots.push(tip.clone());
+  }
+
+  function grow(origin, dir, len, rad, depth){
+    if (branches.length > 240) return;
+    branches.push({ origin: origin.clone(), dir: dir.clone(), len, rad, depth });
+    const tip = origin.clone().addScaledVector(dir, len);
+    if (depth >= gen.maxDepth || len < 0.12){ foliage(tip, dir, depth); return; }
+    const kids = gen.children();
+    for (let k=0;k<kids;k++){
+      const ax = new THREE.Vector3(rng()*2-1, 0, rng()*2-1).normalize();
+      let nd = dir.clone().applyAxisAngle(ax, gen.spread * (0.6 + rng()*0.8));
+      nd.applyAxisAngle(UP, rng()*6.28);
+      nd.y = Math.max(nd.y, -0.15 + gen.vigor*0.1);     // mostly grow upward
+      nd.y -= gen.droop * 0.35;
+      nd.normalize();
+      grow(tip, nd, len*gen.decay*(0.85+rng()*0.3), rad*0.72, depth+1);
+    }
+    if (rng() < 0.6) foliage(tip, dir, depth);
+  }
+
+  // trunk + canopy
+  grow(new THREE.Vector3(0, SOIL_Y, 0), new THREE.Vector3((rng()-0.5)*0.1, 1, (rng()-0.5)*0.1).normalize(),
+       gen.baseLen, gen.baseRad, 0);
+
+  // pick flower positions from slots
+  const chosen = [];
+  for (let i=0;i<flowerSlots.length && chosen.length < gen.flowerBudget; i++){
+    if (rng() < gen.flowerBudget / Math.max(1, flowerSlots.length) + 0.2) chosen.push(flowerSlots[i]);
+  }
+  chosen.forEach(p => flowers.push({ pos: p, scale: 0.07 + rng()*0.06, colIdx: Math.floor(rng()*gen.flowerCols.length) }));
+
+  /* ---- materialise: instanced meshes ---- */
+  const mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+
+  // branches
+  const branchMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, metalness: 0, envMapIntensity: 0.7 });
+  const bMesh = new THREE.InstancedMesh(branchGeo, branchMat, branches.length);
+  bMesh.castShadow = true;
+  const woodTop = new THREE.Color(gen.leafBase).offsetHSL(0, -0.1, 0.05);
+  const woodBot = new THREE.Color(0x5b3d28);
+  branches.forEach((b, i) => {
+    q.setFromUnitVectors(UP, b.dir);
+    s.set(b.rad, b.len, b.rad);
+    p.copy(b.origin);
+    mtx.compose(p, q, s); bMesh.setMatrixAt(i, mtx);
+    bMesh.setColorAt(i, woodBot.clone().lerp(woodTop, clamp(b.depth / gen.maxDepth, 0, 1)));
+  });
+  bMesh.instanceMatrix.needsUpdate = true; if (bMesh.instanceColor) bMesh.instanceColor.needsUpdate = true;
+  plant.add(bMesh); disposables.push(branchMat);
+
+  // leaves
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.62, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.5 });
+  const lMesh = new THREE.InstancedMesh(leafShape, leafMat, leaves.length);
+  lMesh.castShadow = true;
+  leaves.forEach((lf, i) => {
+    s.set(lf.scale * lf.narrow, lf.scale, lf.scale);
+    mtx.compose(lf.pos, lf.quat, s); lMesh.setMatrixAt(i, mtx);
+    lMesh.setColorAt(i, lf.color);
+  });
+  lMesh.instanceMatrix.needsUpdate = true; if (lMesh.instanceColor) lMesh.instanceColor.needsUpdate = true;
+  plant.add(lMesh); disposables.push(leafMat);
+
+  // flowers — one instanced mesh per accent colour so each can glow its own hue
+  const byColor = new Map();
+  flowers.forEach(f => { (byColor.get(f.colIdx) || byColor.set(f.colIdx, []).get(f.colIdx)).push(f); });
+  byColor.forEach((list, idx) => {
+    const col = gen.flowerCols[idx] || gen.flowerCols[0];
+    const fMat = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 1.15, roughness: 0.4, metalness: 0 });
+    const fMesh = new THREE.InstancedMesh(flowerGeo, fMat, list.length);
+    list.forEach((f, i) => { s.set(f.scale, f.scale, f.scale); q.identity(); mtx.compose(f.pos, q, s); fMesh.setMatrixAt(i, mtx); });
+    fMesh.instanceMatrix.needsUpdate = true;
+    plant.add(fMesh); disposables.push(fMat);
+  });
+
+  return { branches: branches.length, leaves: leaves.length, flowers: flowers.length };
+}
+
+/* ----- growth animation (scale the whole plant up like it's sprouting) ----- */
+let growStart = -1, growing = false;
+const GROW_MS = 2600;
+function startGrowth(){ growStart = clock.getElapsedTime()*1000; growing = true; plant.scale.set(0.001,0.001,0.001); }
+function easeOutBack(t){ const c1=1.4, c3=c1+1; return 1 + c3*Math.pow(t-1,3) + c1*Math.pow(t-1,2); }
+
+/* ----- post ----- */
+const composer = new EffectComposer(renderer);
+composer.setPixelRatio(Math.min(devicePixelRatio, 2));
+composer.setSize(innerWidth, innerHeight);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.28, 0.55, 0.78));
+
+/* ----- loop ----- */
+const clock = new THREE.Clock();
+function animate(){
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  if (growing){
+    const k = clamp((t*1000 - growStart) / GROW_MS, 0, 1);
+    const e = easeOutBack(Math.min(1, k*1.0));
+    plant.scale.set(lerp(0.35,1,Math.min(1,k*1.3)), e, lerp(0.35,1,Math.min(1,k*1.3)));
+    if (k >= 1){ growing = false; plant.scale.set(1,1,1); }
+  } else {
+    plant.rotation.z = Math.sin(t*0.6)*0.012;
+    plant.rotation.x = Math.cos(t*0.5)*0.008;
+  }
+
+  // drift spores upward inside the globe
+  const arr = spores.geometry.attributes.position.array, vel = spores.userData.vel;
+  for (let i=0;i<vel.length;i++){
+    arr[i*3+1] += vel[i]*0.016*2;
+    if (arr[i*3+1] > GLOBE_C.y + 1.9) arr[i*3+1] = GLOBE_C.y - 1.9;
+  }
+  spores.geometry.attributes.position.needsUpdate = true;
+
+  controls.update();
+  composer.render();
+}
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+});
+
+/* ============================================================ UI flow */
+const fmtBytes = (b) => b > 1048576 ? (b/1048576).toFixed(1)+' MB' : Math.max(1,Math.round(b/1024))+' KB';
+const fmtMs = (m) => m >= 1000 ? (m/1000).toFixed(1)+' s' : m+' ms';
+
+function renderLegend(dna, gen){
+  $('#dnaHost').textContent = dna.host || 'specimen';
+  $('#dnaHost').title = dna.title || dna.host;
+  $('#dnaSub').textContent = dna.title ? dna.title : 'A plant grown from this site.';
+  const swatches = gen.flowerCols.slice(0,3).map(c => `<i style="background:#${c.getHexString()}"></i>`).join('');
+  const fontName = (dna.families[0] || gen.healthy) ? esc((dna.families[0]||'system').replace(/\b\w/g, m=>m.toUpperCase())) : '—';
+  const vigPct = Math.round(gen.vigor*100);
+  const rows = [
+    ['🎨','Palette', `${dna.colors.length} colours read`, swatches || '—', 'blooms &amp; leaf tint'],
+    ['🔤','Type', esc(dna.fontClass) + (dna.families.length?` · ${dna.families.length} fam`:''), '', 'leaf shape'],
+    ['🌿','Elements', dna.tagCount.toLocaleString()+' tags', '', 'branchiness'],
+    ['🔗','Links', dna.linkCount.toLocaleString(), '', 'leaf density'],
+    ['🖼️','Images', dna.imgCount.toLocaleString(), '', 'blooms'],
+    ['🧱','Weight', fmtBytes(dna.bytes), '', 'height'],
+    ['⚡','Load', fmtMs(dna.ms), '', 'vigour'],
+    ['🔒','Secure', dna.https ? 'https' : 'http', '', dna.https ? 'lush &amp; green' : 'a touch wilted'],
+  ];
+  $('#dnaRows').innerHTML = rows.map(([ic,t,v,sw,map]) => `
+    <div class="row">
+      <span class="ic">${ic}</span>
+      <span class="tx"><b>${t}</b><small>→ ${map}</small></span>
+      ${sw ? `<span class="sw">${sw}</span>` : `<span class="vl">${v}</span>`}
+    </div>`).join('');
+}
+
+let busy = false;
+async function plantUrl(raw){
+  if (busy) return; busy = true;
+  $('#err').textContent = '';
+  $('#gate').style.display = 'none';
+  $('#germ').classList.add('on');
+  let host = raw.replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+  $('#germHost').textContent = host;
+  const stages = ['reaching out…','reading the DNA…','germinating…'];
+  $('#germStage').textContent = stages[0];
+  try {
+    const site = await fetchSite(raw);
+    $('#germStage').textContent = stages[1];
+    const dna = readDNA(site);
+    const gen = genetics(dna);
+    $('#germStage').textContent = stages[2];
+    const stats = buildPlant(gen);
+    renderLegend(dna, gen);
+    try { window.va && window.va('event', { name: 'plant', data: { host: dna.host, leaves: stats.leaves, https: dna.https } }); } catch {}
+    // hand off to the scene
+    controls.autoRotate = true;
+    startGrowth();
+    setTimeout(() => {
+      const scrim = $('#scrim'); scrim.style.opacity = '0';
+      setTimeout(() => { scrim.style.display = 'none'; }, 600);
+      $('#dna').classList.add('on'); $('#bar').classList.add('on');
+      busy = false;
+    }, 500);
+  } catch (e){
+    $('#germ').classList.remove('on');
+    $('#gate').style.display = '';
+    $('#err').textContent = (e && e.message) ? e.message + ' — try another URL.' : 'Could not grow that one. Try another URL.';
+    busy = false;
+  }
+}
+
+$('#form').addEventListener('submit', (e) => { e.preventDefault(); const v = $('#url').value.trim(); if (v) plantUrl(v); });
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => { $('#url').value = c.dataset.u; plantUrl(c.dataset.u); }));
+$('#again').addEventListener('click', () => {
+  $('#dna').classList.remove('on'); $('#bar').classList.remove('on');
+  const scrim = $('#scrim'); scrim.style.display = 'grid'; requestAnimationFrame(() => scrim.style.opacity = '1');
+  $('#germ').classList.remove('on'); $('#gate').style.display = ''; $('#url').value = ''; $('#url').focus();
+});
+
+// focus the input on load
+requestAnimationFrame(() => { try { $('#url').focus(); } catch {} });
+</script>
+
+<!-- Vercel Web Analytics -->
+<script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};</script>
+<script defer src="/_vercel/insights/script.js"></script>
+</body>
+</html>
