@@ -3,7 +3,7 @@
 // the most recent plants; POST records one. Only compact, public site metadata
 // is stored — never the fetched HTML, never anything personal.
 
-import { put, list } from '@vercel/blob';
+import { put, list, del } from '@vercel/blob';
 
 const MAX_ITEMS = 60;
 // low-false-positive guard for a public, displayed list (extend as needed)
@@ -23,8 +23,8 @@ const str = (s, n) => String(s || '').replace(/[\u0000-\u001F\u007F]/g, '').slic
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-garden-key');
   if (req.method === 'OPTIONS') return res.status(204).end();
 
   try {
@@ -77,6 +77,19 @@ export default async function handler(req, res) {
         access: 'public', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json',
       });
       return res.status(200).json({ ok: true });
+    }
+
+    if (req.method === 'DELETE') {
+      const admin = process.env.GARDEN_ADMIN_KEY || '';
+      const key = req.headers['x-garden-key'] || '';
+      if (!admin || key !== admin) return res.status(403).json({ ok: false, error: 'forbidden' });
+      let host = (req.query && req.query.host) || '';
+      if (Array.isArray(host)) host = host[0];
+      host = sanitizeHost(host);
+      if (!host) return res.status(400).json({ ok: false, error: 'bad host' });
+      const { blobs } = await list({ prefix: 'garden/' + host + '.json', limit: 10 });
+      await Promise.all(blobs.map((b) => del(b.url)));
+      return res.status(200).json({ ok: true, deleted: blobs.length });
     }
 
     return res.status(405).json({ ok: false, error: 'method not allowed' });

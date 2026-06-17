@@ -143,7 +143,7 @@
     grid-template-columns:repeat(auto-fill,minmax(178px,1fr)); gap:16px}
   .garden-empty{text-align:center; color:var(--ink-faint); font-size:14px; margin:18vh auto 0; max-width:340px; line-height:1.5}
 
-  .g-card{text-align:left; border:1px solid var(--glass-line); background:rgba(255,255,255,.62);
+  .g-card{position:relative; text-align:left; border:1px solid var(--glass-line); background:rgba(255,255,255,.62);
     border-radius:16px; overflow:hidden; cursor:pointer; padding:0; font:inherit; color:inherit;
     transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease; display:block}
   .g-card:hover{transform:translateY(-3px); box-shadow:0 16px 30px -16px rgba(44,92,57,.4); border-color:rgba(63,125,78,.4)}
@@ -158,6 +158,14 @@
   .g-dots{display:flex; gap:3px; margin:7px 0 6px; min-height:11px}
   .g-dots i{width:11px; height:11px; border-radius:3px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
   .g-stat{font-size:11px; color:var(--ink-faint)}
+  .g-del{position:absolute; top:8px; right:8px; z-index:2; width:24px; height:24px; border-radius:50%;
+    display:grid; place-items:center; font-size:12px; line-height:1; cursor:pointer;
+    background:rgba(255,255,255,.9); color:var(--ink-soft); box-shadow:0 2px 8px rgba(44,92,57,.18);
+    opacity:0; transition:opacity .15s ease, background .15s ease, color .15s ease}
+  .g-card:hover .g-del{opacity:1}
+  .g-del:hover{background:#b4533b; color:#fff}
+  .garden-admin{margin-left:9px; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; font-weight:600;
+    color:var(--moss); border:1px solid var(--glass-line); border-radius:999px; padding:2px 8px; vertical-align:middle}
 
   @media (max-width:720px){
     .garden-overlay{padding:18px 16px 32px}
@@ -233,7 +241,7 @@
 <!-- the shared garden -->
 <div class="garden-overlay" id="garden" aria-hidden="true">
   <header class="garden-top">
-    <div class="garden-title"><b><span class="leaf-dot"></span>the garden</b><span id="gardenCount"></span></div>
+    <div class="garden-title"><b><span class="leaf-dot"></span>the garden</b><span id="gardenCount"></span><span class="garden-admin" id="gardenAdmin" hidden>admin</span></div>
     <button class="garden-close" id="gardenClose" aria-label="close the garden">esc ✕</button>
   </header>
   <p class="garden-note">Every plant anyone has grown. Click one to grow it full-size.</p>
@@ -775,6 +783,32 @@ $('#again').addEventListener('click', () => {
 // a small dedicated renderer makes a still "portrait" of each plant for the grid
 let thumbR = null, thumbScene = null, thumbCam = null;
 const thumbCache = new Map();
+
+// owner-only delete: unlock by visiting with #admin=<key> once (stored locally);
+// the key is verified server-side, so a faked client can't actually delete.
+let ADMIN_KEY = '';
+(function initAdmin(){
+  try {
+    const m = location.hash.match(/admin=([A-Za-z0-9_-]{8,})/);
+    if (m){ ADMIN_KEY = m[1]; localStorage.setItem('terrariumAdmin', ADMIN_KEY); history.replaceState(null, '', location.pathname); }
+    else ADMIN_KEY = localStorage.getItem('terrariumAdmin') || '';
+  } catch {}
+})();
+const isAdmin = () => !!ADMIN_KEY;
+function updateGardenCount(){
+  const n = document.querySelectorAll('#gardenGrid .g-card').length;
+  $('#gardenCount').textContent = n ? n + (n === 1 ? ' plant' : ' plants') : '';
+  if (!n){ const e = $('#gardenEmpty'); e.hidden = false; e.textContent = 'No plants yet. Be the first to grow one.'; }
+}
+async function removeFromGarden(host, el){
+  if (!confirm('Remove ' + host + ' from the garden?')) return;
+  try {
+    const r = await fetch('/api/garden?host=' + encodeURIComponent(host), { method: 'DELETE', headers: { 'x-garden-key': ADMIN_KEY } });
+    const j = await r.json();
+    if (j && j.ok){ el.remove(); thumbCache.delete(host); updateGardenCount(); }
+    else alert('Could not remove: ' + ((j && j.error) || 'error'));
+  } catch { alert('Could not remove that one.'); }
+}
 function initThumb(){
   if (thumbR) return;
   thumbR = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
@@ -819,6 +853,12 @@ function makeCard(dna){
     <span class="g-meta"><b class="g-host">${esc(dna.host || '—')}</b>
     <span class="g-dots">${dots}</span><span class="g-stat">${esc(fmtStat(dna))}</span></span>`;
   el.addEventListener('click', () => pickFromGarden(dna));
+  if (isAdmin()){
+    const x = document.createElement('span');
+    x.className = 'g-del'; x.setAttribute('role', 'button'); x.title = 'remove from garden'; x.textContent = '✕';
+    x.addEventListener('click', (e) => { e.stopPropagation(); removeFromGarden(dna.host, el); });
+    el.appendChild(x);
+  }
   return { el, dna, setThumb(url){ const t = el.querySelector('.g-thumb');
     if (url){ const i = new Image(); i.alt = ''; i.src = url; t.innerHTML = ''; t.appendChild(i); }
     else t.classList.add('g-thumb-empty'); } };
@@ -833,6 +873,7 @@ function pickFromGarden(dna){
 function closeGarden(){ const o = $('#garden'); o.classList.remove('on'); o.setAttribute('aria-hidden', 'true'); }
 async function openGarden(){
   const ov = $('#garden'); ov.classList.add('on'); ov.setAttribute('aria-hidden', 'false');
+  $('#gardenAdmin').hidden = !isAdmin();
   const grid = $('#gardenGrid'); grid.innerHTML = ''; $('#gardenCount').textContent = 'gathering…';
   const empty = $('#gardenEmpty'); empty.hidden = true;
   let data = null;
