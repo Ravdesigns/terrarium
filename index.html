@@ -301,23 +301,34 @@ function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t
 /* ============================================================ DNA: read a site's markup */
 async function fetchSite(rawUrl){
   let u = rawUrl.trim(); if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
-  // prod: our serverless proxy. local/dev fallback: a public CORS reader.
+  // primary: our serverless proxy. if it answers "unreachable", trust it and wilt
+  // straight away — only fall back to the public reader when the proxy is absent
+  // (local dev / function down), so a broken link doesn't wait through two waits.
   try {
     const r = await fetch('/api/raw?url=' + encodeURIComponent(u));
-    if (r.ok) { const j = await r.json(); if (j && j.ok && j.html) return j; if (j && !j.ok) throw new Error(j.error || 'unreachable'); }
-    throw new Error('noapi');
+    if (r.ok) {
+      const j = await r.json();
+      if (j && j.ok) return j;                          // proxy reached the site
+      throw new Error('unreachable');                   // definitive → wilt now, no fallback
+    }
+    throw new Error('noapi');                            // proxy not available here
   } catch (e) {
-    if (e && e.message && e.message !== 'noapi') { /* real reachability error from api */ }
-    // fallback (works on a plain static server)
-    const t0 = performance.now();
-    const r2 = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(u));
-    if (!r2.ok) throw new Error('could not reach site');
-    const j2 = await r2.json();
-    const html = (j2 && j2.contents) || '';
-    if (!html) throw new Error('could not reach site');
-    return { ok:true, finalUrl: (j2.status && j2.status.url) || u, https: u.startsWith('https'),
-      ms: Math.round(performance.now() - t0), bytes: html.length, html };
+    if (e && e.message === 'unreachable') throw e;       // skip the fallback
   }
+  // fallback: a public CORS reader (covers a plain static server). Abort if it
+  // hangs so a broken link still wilts instead of spinning forever.
+  const t0 = performance.now();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 9000);
+  let r2;
+  try { r2 = await fetch('https://api.allorigins.win/get?url=' + encodeURIComponent(u), { signal: ctrl.signal }); }
+  finally { clearTimeout(timer); }
+  if (!r2.ok) throw new Error('could not reach site');
+  const j2 = await r2.json();
+  const html = (j2 && j2.contents) || '';
+  if (!html) throw new Error('could not reach site');
+  return { ok:true, finalUrl: (j2.status && j2.status.url) || u, https: u.startsWith('https'),
+    ms: Math.round(performance.now() - t0), bytes: html.length, html };
 }
 
 function parseHexish(tok){
