@@ -930,6 +930,18 @@ addEventListener('keydown', (e) => { if (e.key === 'Escape') closeGarden(); });
 
 // focus the input on load
 requestAnimationFrame(() => { try { $('#url').focus(); } catch {} });
+
+;(function(){try{
+const dna={host:'stripe.com',title:'Stripe',description:'',themeColor:'#635bff',ogImage:'',
+colors:[{hex:'#635bff',count:160},{hex:'#7a73ff',count:70},{hex:'#00d4ff',count:50},{hex:'#a960ee',count:40},{hex:'#11efe3',count:25},{hex:'#0a2540',count:90},{hex:'#ffffff',count:220}],
+families:['sohne','sans-serif'],fontClass:'sans',tagCount:2600,linkCount:190,imgCount:64,scriptCount:30,https:true,ms:300,bytes:880000};
+growFromDNA(dna);growing=false;plant.scale.set(fitScale,fitScale,fitScale);
+try{controls.autoRotate=false;controls.update&&controls.update();}catch(e){}
+try{plant.rotation.y=0.6;}catch(e){}
+const s=document.getElementById('scrim');if(s){s.style.opacity='0';s.style.display='none';}
+const d=document.getElementById('dna');if(d)d.classList.add('on');
+const b=document.getElementById('bar');if(b)b.classList.add('on');
+}catch(e){document.title='AUTOERR '+(e&&e.message);}})();
 </script>
 
 <!-- Vercel Web Analytics -->
