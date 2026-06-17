@@ -158,12 +158,32 @@
   .g-dots{display:flex; gap:3px; margin:7px 0 6px; min-height:11px}
   .g-dots i{width:11px; height:11px; border-radius:3px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
   .g-stat{font-size:11px; color:var(--ink-faint)}
-  .g-del{position:absolute; top:8px; right:8px; z-index:2; width:24px; height:24px; border-radius:50%;
-    display:grid; place-items:center; font-size:12px; line-height:1; cursor:pointer;
-    background:rgba(255,255,255,.9); color:var(--ink-soft); box-shadow:0 2px 8px rgba(44,92,57,.18);
-    opacity:0; transition:opacity .15s ease, background .15s ease, color .15s ease}
+  .g-card:focus-visible{outline:none; box-shadow:0 0 0 3px rgba(63,125,78,.35)}
+  .g-card.removing{opacity:0; transform:scale(.92); transition:opacity .32s ease, transform .32s ease}
+  .g-del{position:absolute; top:8px; right:8px; z-index:3; width:28px; height:28px; border-radius:50%;
+    border:0; padding:0; display:grid; place-items:center; cursor:pointer; color:var(--ink-soft);
+    background:rgba(255,255,255,.86); backdrop-filter:blur(6px); box-shadow:0 2px 10px rgba(44,92,57,.22);
+    opacity:.72; transition:opacity .15s ease, background .15s ease, color .15s ease, transform .15s ease}
   .g-card:hover .g-del{opacity:1}
-  .g-del:hover{background:#b4533b; color:#fff}
+  .g-del:hover{background:#b4533b; color:#fff; transform:scale(1.08)}
+  .g-card.confirming .g-del{opacity:0; pointer-events:none}
+
+  /* admin: inline remove confirm (replaces the native dialog) */
+  .g-confirm{position:absolute; inset:0; z-index:4; display:grid; place-items:center; padding:14px;
+    text-align:center; background:rgba(247,242,228,.88); backdrop-filter:blur(8px);
+    opacity:0; transform:scale(1.02); pointer-events:none; transition:opacity .16s ease, transform .16s ease}
+  .g-card.confirming .g-confirm{opacity:1; transform:none; pointer-events:auto}
+  .gc-in{display:flex; flex-direction:column; align-items:center; gap:3px}
+  .gc-in b{font-family:var(--serif); font-weight:500; font-size:14.5px; color:var(--ink); line-height:1.15}
+  .gc-host{font-size:11.5px; color:var(--ink-faint); max-width:92%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .gc-err{font-size:10.5px; color:#b4533b; min-height:.9em; margin-top:1px}
+  .gc-row{display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:9px}
+  .gc-keep,.gc-remove{border-radius:999px; font:inherit; font-size:12px; font-weight:600; padding:7px 14px; cursor:pointer; transition:all .15s ease}
+  .gc-keep{border:1px solid var(--glass-line); background:rgba(255,255,255,.7); color:var(--ink-soft)}
+  .gc-keep:hover{border-color:var(--moss); color:var(--moss)}
+  .gc-remove{border:0; background:#b4533b; color:#fff}
+  .gc-remove:hover{background:#9a4230}
+  .gc-remove:disabled{opacity:.65; cursor:default}
   .garden-admin{margin-left:9px; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; font-weight:600;
     color:var(--moss); border:1px solid var(--glass-line); border-radius:999px; padding:2px 8px; vertical-align:middle}
 
@@ -826,14 +846,18 @@ function updateGardenCount(){
   $('#gardenCount').textContent = n ? n + (n === 1 ? ' plant' : ' plants') : '';
   if (!n){ const e = $('#gardenEmpty'); e.hidden = false; e.textContent = 'No plants yet. Be the first to grow one.'; }
 }
-async function removeFromGarden(host, el){
-  if (!confirm('Remove ' + host + ' from the garden?')) return;
+async function doDelete(host, el, conf){
+  const btn = conf.querySelector('.gc-remove'), err = conf.querySelector('.gc-err');
+  btn.disabled = true; btn.textContent = 'Removing…'; err.textContent = '';
   try {
     const r = await fetch('/api/garden?host=' + encodeURIComponent(host), { method: 'DELETE', headers: { 'x-garden-key': ADMIN_KEY } });
     const j = await r.json();
-    if (j && j.ok){ el.remove(); thumbCache.delete(host); updateGardenCount(); }
-    else alert('Could not remove: ' + ((j && j.error) || 'error'));
-  } catch { alert('Could not remove that one.'); }
+    if (j && j.ok){
+      thumbCache.delete(host);
+      el.classList.add('removing');
+      setTimeout(() => { el.remove(); updateGardenCount(); }, 340);
+    } else { btn.disabled = false; btn.textContent = 'Remove'; err.textContent = (j && j.error) || 'could not remove'; }
+  } catch { btn.disabled = false; btn.textContent = 'Remove'; err.textContent = 'network error'; }
 }
 function initThumb(){
   if (thumbR) return;
@@ -871,19 +895,37 @@ function renderThumb(dna){
 }
 
 const fmtStat = (dna) => `${(dna.tagCount || 0).toLocaleString()} tags · ${dna.ms >= 1000 ? (dna.ms / 1000).toFixed(1) + ' s' : (dna.ms || 0) + ' ms'}`;
+const TRASH_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5h6V7M7 7l1 12.5h8L17 7"/></svg>';
 function makeCard(dna){
-  const el = document.createElement('button'); el.type = 'button'; el.className = 'g-card';
+  const el = document.createElement('div');
+  el.className = 'g-card'; el.setAttribute('role', 'button'); el.tabIndex = 0;
   const dots = (dna.colors || []).slice(0, 5)
     .map(c => `<i style="background:${/^#[0-9a-f]{6}$/i.test(c.hex || '') ? c.hex : '#9aa'}"></i>`).join('');
   el.innerHTML = `<span class="g-thumb"><span class="g-shim"></span></span>
     <span class="g-meta"><b class="g-host">${esc(dna.host || '—')}</b>
     <span class="g-dots">${dots}</span><span class="g-stat">${esc(fmtStat(dna))}</span></span>`;
-  el.addEventListener('click', () => pickFromGarden(dna));
+  const pick = () => pickFromGarden(dna);
+  el.addEventListener('click', pick);
+  el.addEventListener('keydown', (e) => {
+    if (el.classList.contains('confirming')) return;
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); }
+  });
   if (isAdmin()){
-    const x = document.createElement('span');
-    x.className = 'g-del'; x.setAttribute('role', 'button'); x.title = 'remove from garden'; x.textContent = '✕';
-    x.addEventListener('click', (e) => { e.stopPropagation(); removeFromGarden(dna.host, el); });
-    el.appendChild(x);
+    el.classList.add('is-admin');
+    const trash = document.createElement('button');
+    trash.type = 'button'; trash.className = 'g-del'; trash.title = 'Remove from garden';
+    trash.setAttribute('aria-label', 'Remove ' + (dna.host || '') + ' from the garden');
+    trash.innerHTML = TRASH_SVG;
+    const conf = document.createElement('div');
+    conf.className = 'g-confirm';
+    conf.innerHTML = `<div class="gc-in"><b>Remove this plant?</b>
+      <span class="gc-host">${esc(dna.host || '')}</span><span class="gc-err"></span>
+      <div class="gc-row"><button type="button" class="gc-keep">Keep</button><button type="button" class="gc-remove">Remove</button></div></div>`;
+    trash.addEventListener('click', (e) => { e.stopPropagation(); el.classList.add('confirming'); conf.querySelector('.gc-remove').focus(); });
+    conf.addEventListener('click', (e) => e.stopPropagation());
+    conf.querySelector('.gc-keep').addEventListener('click', (e) => { e.stopPropagation(); el.classList.remove('confirming'); trash.focus(); });
+    conf.querySelector('.gc-remove').addEventListener('click', (e) => { e.stopPropagation(); doDelete(dna.host, el, conf); });
+    el.append(trash, conf);
   }
   return { el, dna, setThumb(url){ const t = el.querySelector('.g-thumb');
     if (url){ const i = new Image(); i.alt = ''; i.src = url; t.innerHTML = ''; t.appendChild(i); }
