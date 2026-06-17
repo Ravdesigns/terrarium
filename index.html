@@ -119,8 +119,50 @@
     display:inline-flex; align-items:center; gap:7px; transition:all .15s ease}
   .bar .again:hover{border-color:var(--moss); color:var(--moss)}
   .bar .hint{font-size:11.5px; color:var(--ink-faint)}
+  .leaf-dot.sm{width:6px; height:6px; margin-right:6px}
+
+  /* ---- gate link to the garden ---- */
+  .ghostlink{display:inline-block; margin-top:16px; border:0; background:none; cursor:pointer;
+    font:inherit; font-size:13px; font-weight:500; color:var(--moss); letter-spacing:.01em}
+  .ghostlink:hover{color:var(--moss-deep); text-decoration:underline; text-underline-offset:3px}
+
+  /* ---- the shared garden ---- */
+  .garden-overlay{position:fixed; inset:0; z-index:20; overflow-y:auto; padding:26px 30px 40px;
+    background:linear-gradient(180deg,#f4eede 0%,#e6ecd9 100%);
+    opacity:0; visibility:hidden; pointer-events:none; transition:opacity .4s ease, visibility .4s}
+  .garden-overlay.on{opacity:1; visibility:visible; pointer-events:auto}
+  .garden-top{display:flex; align-items:center; justify-content:space-between; max-width:1100px; margin:0 auto 4px}
+  .garden-title b{font-family:var(--serif); font-weight:500; font-size:24px; letter-spacing:-.02em; color:var(--ink)}
+  .garden-title span{margin-left:11px; font-size:13px; color:var(--ink-faint)}
+  .garden-close{border:1px solid var(--glass-line); background:rgba(255,255,255,.7); color:var(--ink-soft);
+    font:inherit; font-size:12.5px; font-weight:500; padding:8px 13px; border-radius:999px; cursor:pointer;
+    letter-spacing:.02em; transition:all .15s ease}
+  .garden-close:hover{border-color:var(--moss); color:var(--moss)}
+  .garden-note{max-width:1100px; margin:0 auto 20px; font-size:13px; color:var(--ink-soft)}
+  .garden-grid{max-width:1100px; margin:0 auto; display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(178px,1fr)); gap:16px}
+  .garden-empty{text-align:center; color:var(--ink-faint); font-size:14px; margin:18vh auto 0; max-width:340px; line-height:1.5}
+
+  .g-card{text-align:left; border:1px solid var(--glass-line); background:rgba(255,255,255,.62);
+    border-radius:16px; overflow:hidden; cursor:pointer; padding:0; font:inherit; color:inherit;
+    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease; display:block}
+  .g-card:hover{transform:translateY(-3px); box-shadow:0 16px 30px -16px rgba(44,92,57,.4); border-color:rgba(63,125,78,.4)}
+  .g-thumb{display:block; width:100%; aspect-ratio:1/1; position:relative; overflow:hidden;
+    background:radial-gradient(120% 100% at 50% 22%,#fbf7ee,#dfe7d3)}
+  .g-thumb img{width:100%; height:100%; object-fit:contain; display:block}
+  .g-shim{position:absolute; inset:0; background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.55) 50%,transparent 70%);
+    background-size:220% 100%; animation:shim 1.3s linear infinite}
+  @keyframes shim{from{background-position:140% 0}to{background-position:-140% 0}}
+  .g-meta{padding:11px 13px 13px}
+  .g-host{display:block; font-size:13.5px; font-weight:600; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .g-dots{display:flex; gap:3px; margin:7px 0 6px; min-height:11px}
+  .g-dots i{width:11px; height:11px; border-radius:3px; box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+  .g-stat{font-size:11px; color:var(--ink-faint)}
 
   @media (max-width:720px){
+    .garden-overlay{padding:18px 16px 32px}
+    .garden-grid{grid-template-columns:repeat(auto-fill,minmax(136px,1fr)); gap:12px}
+    .garden-title b{font-size:20px}
     .wordmark{top:14px; left:16px} .wordmark span{display:none}
     .dna{width:100%; height:auto; top:auto; bottom:0; padding:0}
     .dna .panel{margin:0; max-height:46vh; overflow:auto; border-radius:18px 18px 0 0;
@@ -147,6 +189,7 @@
 <!-- footer -->
 <div class="bar" id="bar">
   <button class="again" id="again"><span>↺</span> plant another</button>
+  <button class="again" id="gardenBtn"><span class="leaf-dot sm"></span> the garden</button>
   <span class="hint">drag to look around · scroll to zoom</span>
 </div>
 
@@ -171,7 +214,8 @@
         <button class="chip" data-u="wikipedia.org">wikipedia.org</button>
       </div>
       <div class="err" id="err"></div>
-      <p class="privacy">Nothing is stored. The site is fetched once to read its public markup, then forgotten.</p>
+      <button class="ghostlink" id="gardenLink" type="button">or wander the shared garden →</button>
+      <p class="privacy">We read a site's public markup once to grow it. Your plant joins the shared garden — only public traits, nothing personal.</p>
     </div>
 
     <div class="germ" id="germ">
@@ -184,6 +228,17 @@
       <div class="stage" id="germStage">reaching out…</div>
     </div>
   </div>
+</div>
+
+<!-- the shared garden -->
+<div class="garden-overlay" id="garden" aria-hidden="true">
+  <header class="garden-top">
+    <div class="garden-title"><b><span class="leaf-dot"></span>the garden</b><span id="gardenCount"></span></div>
+    <button class="garden-close" id="gardenClose" aria-label="close the garden">esc ✕</button>
+  </header>
+  <p class="garden-note">Every plant anyone has grown. Click one to grow it full-size.</p>
+  <div class="garden-grid" id="gardenGrid"></div>
+  <p class="garden-empty" id="gardenEmpty" hidden></p>
 </div>
 
 <script type="importmap">
@@ -470,8 +525,7 @@ function clearPlant(){
   disposables.forEach(d => { try { d.dispose(); } catch {} }); disposables = [];
 }
 
-function buildPlant(gen){
-  clearPlant();
+function buildPlant(gen, group = plant, bag = disposables){
   const { rng } = gen;
   const branches = [];   // {origin, dir, len, rad, depth}
   const leaves = [];     // {pos, quat, scale, color}
@@ -543,7 +597,7 @@ function buildPlant(gen){
     bMesh.setColorAt(i, woodBot.clone().lerp(woodTop, clamp(b.depth / gen.maxDepth, 0, 1)));
   });
   bMesh.instanceMatrix.needsUpdate = true; if (bMesh.instanceColor) bMesh.instanceColor.needsUpdate = true;
-  plant.add(bMesh); disposables.push(branchMat);
+  group.add(bMesh); bag.push(branchMat);
 
   // leaves
   const leafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.62, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.5 });
@@ -555,7 +609,7 @@ function buildPlant(gen){
     lMesh.setColorAt(i, lf.color);
   });
   lMesh.instanceMatrix.needsUpdate = true; if (lMesh.instanceColor) lMesh.instanceColor.needsUpdate = true;
-  plant.add(lMesh); disposables.push(leafMat);
+  group.add(lMesh); bag.push(leafMat);
 
   // flowers — one instanced mesh per accent colour so each can glow its own hue
   const byColor = new Map();
@@ -566,10 +620,15 @@ function buildPlant(gen){
     const fMesh = new THREE.InstancedMesh(flowerGeo, fMat, list.length);
     list.forEach((f, i) => { s.set(f.scale, f.scale, f.scale); q.identity(); mtx.compose(f.pos, q, s); fMesh.setMatrixAt(i, mtx); });
     fMesh.instanceMatrix.needsUpdate = true;
-    plant.add(fMesh); disposables.push(fMat);
+    group.add(fMesh); bag.push(fMat);
   });
 
-  return { branches: branches.length, leaves: leaves.length, flowers: flowers.length };
+  // real bounds (Box3.setFromObject misses per-instance transforms), for thumbnail framing
+  const bbox = new THREE.Box3();
+  branches.forEach(b => { bbox.expandByPoint(b.origin); bbox.expandByPoint(b.origin.clone().addScaledVector(b.dir, b.len)); });
+  leaves.forEach(lf => bbox.expandByPoint(lf.pos));
+  flowers.forEach(f => bbox.expandByPoint(f.pos));
+  return { branches: branches.length, leaves: leaves.length, flowers: flowers.length, bbox };
 }
 
 /* ----- growth animation (scale the whole plant up like it's sprouting) ----- */
@@ -648,6 +707,34 @@ function renderLegend(dna, gen){
     </div>`).join('');
 }
 
+// build + legend + start the growth animation from a DNA object (shared by the
+// live-plant flow and by picking a plant out of the garden)
+function growFromDNA(dna){
+  clearPlant();
+  const gen = genetics(dna);
+  const stats = buildPlant(gen);
+  renderLegend(dna, gen);
+  controls.autoRotate = true;
+  startGrowth();
+  return { gen, stats };
+}
+function revealScene(){
+  setTimeout(() => {
+    const scrim = $('#scrim'); scrim.style.opacity = '0';
+    setTimeout(() => { scrim.style.display = 'none'; }, 600);
+    $('#dna').classList.add('on'); $('#bar').classList.add('on');
+  }, 500);
+}
+// record this plant in the shared garden (fire-and-forget; only public traits)
+function postToGarden(dna){
+  try {
+    const body = { host:dna.host, title:dna.title, colors:(dna.colors||[]).slice(0,12), families:(dna.families||[]).slice(0,6),
+      fontClass:dna.fontClass, tagCount:dna.tagCount, linkCount:dna.linkCount, imgCount:dna.imgCount,
+      scriptCount:dna.scriptCount, https:dna.https, ms:dna.ms, bytes:dna.bytes };
+    fetch('/api/garden', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).catch(()=>{});
+  } catch {}
+}
+
 let busy = false;
 async function plantUrl(raw){
   if (busy) return; busy = true;
@@ -662,20 +749,12 @@ async function plantUrl(raw){
     const site = await fetchSite(raw);
     $('#germStage').textContent = stages[1];
     const dna = readDNA(site);
-    const gen = genetics(dna);
     $('#germStage').textContent = stages[2];
-    const stats = buildPlant(gen);
-    renderLegend(dna, gen);
+    const { stats } = growFromDNA(dna);
     try { window.va && window.va('event', { name: 'plant', data: { host: dna.host, leaves: stats.leaves, https: dna.https } }); } catch {}
-    // hand off to the scene
-    controls.autoRotate = true;
-    startGrowth();
-    setTimeout(() => {
-      const scrim = $('#scrim'); scrim.style.opacity = '0';
-      setTimeout(() => { scrim.style.display = 'none'; }, 600);
-      $('#dna').classList.add('on'); $('#bar').classList.add('on');
-      busy = false;
-    }, 500);
+    postToGarden(dna);
+    revealScene();
+    busy = false;
   } catch (e){
     $('#germ').classList.remove('on');
     $('#gate').style.display = '';
@@ -691,6 +770,96 @@ $('#again').addEventListener('click', () => {
   const scrim = $('#scrim'); scrim.style.display = 'grid'; requestAnimationFrame(() => scrim.style.opacity = '1');
   $('#germ').classList.remove('on'); $('#gate').style.display = ''; $('#url').value = ''; $('#url').focus();
 });
+
+/* ============================================================ the shared garden */
+// a small dedicated renderer makes a still "portrait" of each plant for the grid
+let thumbR = null, thumbScene = null, thumbCam = null;
+const thumbCache = new Map();
+function initThumb(){
+  if (thumbR) return;
+  thumbR = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  thumbR.setPixelRatio(Math.min(devicePixelRatio, 2));
+  thumbR.setSize(300, 300);
+  thumbR.toneMapping = THREE.ACESFilmicToneMapping; thumbR.toneMappingExposure = 0.98;
+  thumbScene = new THREE.Scene();
+  thumbScene.add(new THREE.HemisphereLight(0xfff4e2, 0x8fa07d, 0.7));
+  const tk = new THREE.DirectionalLight(0xfff1da, 1.15); tk.position.set(-3, 6, 5); thumbScene.add(tk);
+  const tf = new THREE.DirectionalLight(0xdfeeff, 0.32); tf.position.set(4, 2, -3); thumbScene.add(tf);
+  const tsoil = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.2, 0.3, 32),
+    new THREE.MeshStandardMaterial({ color: 0x3a2a1d, roughness: 1 }));
+  tsoil.position.y = SOIL_Y - 0.2; thumbScene.add(tsoil);
+  thumbCam = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+}
+function renderThumb(dna){
+  initThumb();
+  const gen = genetics(dna);
+  const g = new THREE.Group(); const bag = [];
+  const { bbox } = buildPlant(gen, g, bag);
+  thumbScene.add(g);
+  const c = bbox.getCenter(new THREE.Vector3());
+  const size = bbox.getSize(new THREE.Vector3());
+  const maxd = Math.max(size.x, size.y, size.z, 1);
+  const dist = maxd * 1.25 + 1.0;
+  thumbCam.position.set(c.x + dist * 0.16, c.y + dist * 0.05, c.z + dist);
+  thumbCam.lookAt(c);
+  thumbR.render(thumbScene, thumbCam);
+  const url = thumbR.domElement.toDataURL('image/png');
+  thumbScene.remove(g);
+  g.traverse(o => { if (o.isInstancedMesh && o.dispose) o.dispose(); });
+  bag.forEach(m => { try { m.dispose(); } catch {} });
+  return url;
+}
+
+const fmtStat = (dna) => `${(dna.tagCount || 0).toLocaleString()} tags · ${dna.ms >= 1000 ? (dna.ms / 1000).toFixed(1) + ' s' : (dna.ms || 0) + ' ms'}`;
+function makeCard(dna){
+  const el = document.createElement('button'); el.type = 'button'; el.className = 'g-card';
+  const dots = (dna.colors || []).slice(0, 5)
+    .map(c => `<i style="background:${/^#[0-9a-f]{6}$/i.test(c.hex || '') ? c.hex : '#9aa'}"></i>`).join('');
+  el.innerHTML = `<span class="g-thumb"><span class="g-shim"></span></span>
+    <span class="g-meta"><b class="g-host">${esc(dna.host || '—')}</b>
+    <span class="g-dots">${dots}</span><span class="g-stat">${esc(fmtStat(dna))}</span></span>`;
+  el.addEventListener('click', () => pickFromGarden(dna));
+  return { el, dna, setThumb(url){ const t = el.querySelector('.g-thumb');
+    if (url){ const i = new Image(); i.alt = ''; i.src = url; t.innerHTML = ''; t.appendChild(i); }
+    else t.classList.add('g-thumb-empty'); } };
+}
+function pickFromGarden(dna){
+  closeGarden();
+  $('#gate').style.display = 'none'; $('#germ').classList.remove('on');
+  const scrim = $('#scrim'); scrim.style.opacity = '0'; scrim.style.display = 'none';
+  growFromDNA(dna);
+  $('#dna').classList.add('on'); $('#bar').classList.add('on');
+}
+function closeGarden(){ const o = $('#garden'); o.classList.remove('on'); o.setAttribute('aria-hidden', 'true'); }
+async function openGarden(){
+  const ov = $('#garden'); ov.classList.add('on'); ov.setAttribute('aria-hidden', 'false');
+  const grid = $('#gardenGrid'); grid.innerHTML = ''; $('#gardenCount').textContent = 'gathering…';
+  const empty = $('#gardenEmpty'); empty.hidden = true;
+  let data = null;
+  try { const r = await fetch('/api/garden'); data = await r.json(); } catch {}
+  const items = (data && data.ok && Array.isArray(data.items)) ? data.items : [];
+  if (!items.length){
+    $('#gardenCount').textContent = '';
+    empty.hidden = false;
+    empty.textContent = data === null
+      ? 'The shared garden lives on the deployed site — grow one there.'
+      : 'No plants yet. Be the first to grow one.';
+    return;
+  }
+  $('#gardenCount').textContent = items.length + (items.length === 1 ? ' plant' : ' plants');
+  const cards = items.map(makeCard);
+  cards.forEach(c => grid.appendChild(c.el));
+  for (const c of cards){
+    if (!ov.classList.contains('on')) break;            // user closed mid-render
+    try { const u = thumbCache.get(c.dna.host) || renderThumb(c.dna); thumbCache.set(c.dna.host, u); c.setThumb(u); }
+    catch { c.setThumb(null); }
+    await new Promise(r => requestAnimationFrame(r));    // yield so the grid stays responsive
+  }
+}
+$('#gardenBtn').addEventListener('click', openGarden);
+$('#gardenLink').addEventListener('click', openGarden);
+$('#gardenClose').addEventListener('click', closeGarden);
+addEventListener('keydown', (e) => { if (e.key === 'Escape') closeGarden(); });
 
 // focus the input on load
 requestAnimationFrame(() => { try { $('#url').focus(); } catch {} });
