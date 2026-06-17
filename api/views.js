@@ -1,5 +1,5 @@
 // A simple shared visit counter, stored as one Blob. Approximate by design
-// (read-modify-write, no locks) — fine for social proof, not accounting.
+// (read-modify-write, no locks), fine for social proof, not accounting.
 // The blob is written with no CDN caching and read fresh so the count moves.
 
 import { put, list } from '@vercel/blob';

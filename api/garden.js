@@ -1,7 +1,7 @@
 // The shared garden: every plant anyone grows is recorded here (one Blob per
-// host, so re-planting a site just refreshes it — no write races). GET returns
+// host, so re-planting a site just refreshes it; no write races). GET returns
 // the most recent plants; POST records one. Only compact, public site metadata
-// is stored — never the fetched HTML, never anything personal.
+// is stored, never the fetched HTML, never anything personal.
 
 import { put, list, del } from '@vercel/blob';
 

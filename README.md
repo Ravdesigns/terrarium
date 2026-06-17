@@ -2,11 +2,11 @@
 
 **paste any website. watch a one-of-a-kind plant grow from its DNA.**
 
-terrarium reads a site's public markup — its colours, fonts, page weight, number
-of elements, links, images, load speed, and whether it's secure — and grows a
+terrarium reads a site's public markup (its colours, fonts, page weight, number
+of elements, links, images, load speed, and whether it's secure) and grows a
 generative plant from those traits, sealed in a little glass globe. faster sites
 grow more vigorously; heavier pages grow taller; the site's own palette becomes
-the blooms and leaf tint; https keeps it lush. it's deterministic — the same URL
+the blooms and leaf tint; https keeps it lush. it's deterministic: the same URL
 always grows the same plant.
 
 built with three.js. the only server-side piece is a tiny fetch proxy
@@ -38,7 +38,7 @@ CORS reader. On Vercel it uses `/api/raw`.
 | load speed (ms)           | → | vigour               |
 | https                     | → | lushness / health    |
 
-Nothing is stored — the site is fetched once to read its public markup, then
+Nothing is stored. The site is fetched once to read its public markup, then
 forgotten.
 
 By [Ravindra Sisodia](https://github.com/Ravdesigns).

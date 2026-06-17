@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>terrarium · grow a plant from any website</title>
-<meta name="description" content="Paste a website. Watch a one-of-a-kind plant grow from its DNA — colours, fonts, weight, speed." />
+<meta name="description" content="Paste a website. Watch a one-of-a-kind plant grow from its DNA: colours, fonts, weight, speed." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600&display=swap" rel="stylesheet" />
@@ -210,7 +210,7 @@
 <!-- DNA legend -->
 <aside class="dna" id="dna">
   <div class="panel">
-    <div class="head"><h2 id="dnaHost">—</h2><span class="sp" id="dnaSp">specimen</span></div>
+    <div class="head"><h2 id="dnaHost">·</h2><span class="sp" id="dnaSp">specimen</span></div>
     <p class="sub" id="dnaSub">Every plant is grown from the site's own traits.</p>
     <div id="dnaRows"></div>
   </div>
@@ -230,7 +230,7 @@
     <div id="gate">
       <div class="eyebrow">a living portrait of the web</div>
       <h1>Plant a website.</h1>
-      <p>Paste any URL. We read the site's DNA — its colours, type, weight and speed — and grow a one-of-a-kind plant from it.</p>
+      <p>Paste any URL. We read the site's DNA (its colours, type, weight and speed) and grow a one-of-a-kind plant from it.</p>
       <form class="field" id="form">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>
         <input id="url" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="stripe.com" aria-label="website url" />
@@ -247,7 +247,7 @@
       <div class="err" id="err"></div>
       <button class="ghostlink" id="gardenLink" type="button">or wander the shared garden →</button>
       <p class="visitors" id="visitors" hidden></p>
-      <p class="privacy">We read a site's public markup once to grow it. Your plant joins the shared garden — only public traits, nothing personal.</p>
+      <p class="privacy">We read a site's public markup once to grow it. Your plant joins the shared garden. Only public traits, nothing personal.</p>
     </div>
 
     <div class="germ" id="germ">
@@ -302,7 +302,7 @@ function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t
 async function fetchSite(rawUrl){
   let u = rawUrl.trim(); if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
   // primary: our serverless proxy. if it answers "unreachable", trust it and wilt
-  // straight away — only fall back to the public reader when the proxy is absent
+  // straight away, and only fall back to the public reader when the proxy is absent
   // (local dev / function down), so a broken link doesn't wait through two waits.
   try {
     const r = await fetch('/api/raw?url=' + encodeURIComponent(u));
@@ -356,7 +356,7 @@ function readDNA(site){
   const themeColor = metaOf('theme-color');
   const ogImage = metaOf('og:image');
 
-  // colours — tally everything that looks like a colour in inline styles / <style>
+  // colours: tally everything that looks like a colour in inline styles / <style>
   const tally = new Map();
   const add = (c) => { if(!c) return; const k = '#'+c.getHexString(); tally.set(k, (tally.get(k)||0)+1); };
   add(parseHexish(themeColor));
@@ -682,7 +682,7 @@ function buildPlant(gen, group = plant, bag = disposables){
   lMesh.instanceMatrix.needsUpdate = true; if (lMesh.instanceColor) lMesh.instanceColor.needsUpdate = true;
   group.add(lMesh); bag.push(leafMat);
 
-  // flowers — one instanced mesh per accent colour so each can glow its own hue
+  // flowers: one instanced mesh per accent colour so each can glow its own hue
   const byColor = new Map();
   flowers.forEach(f => { (byColor.get(f.colIdx) || byColor.set(f.colIdx, []).get(f.colIdx)).push(f); });
   byColor.forEach((list, idx) => {
@@ -694,7 +694,7 @@ function buildPlant(gen, group = plant, bag = disposables){
     group.add(fMesh); bag.push(fMat);
   });
 
-  // real outer points (branch tips + actual leaf tips) — used to fit inside the globe.
+  // real outer points (branch tips + actual leaf tips) used to fit inside the globe.
   // bbox (axis-aligned) is kept only for thumbnail framing; its corners are phantom
   // points unsuitable for a radial fit.
   const bbox = new THREE.Box3();
@@ -782,18 +782,18 @@ function renderLegend(dna, gen, dead){
   $('#dnaHost').title = dna.title || dna.host;
   $('#dnaSp').textContent = dead ? 'withered' : 'specimen';
   if (dead){
-    $('#dnaSub').textContent = 'This site never answered — so a wilted little thing grew instead.';
+    $('#dnaSub').textContent = 'This site never answered, so a wilted little thing grew instead.';
     $('#dnaRows').innerHTML = `
       <div class="row"><span class="ic">🥀</span><span class="tx"><b>No response</b><small>→ nothing to read</small></span><span class="vl">wilted</span></div>
-      <div class="row"><span class="ic">↺</span><span class="tx"><b>Check the link</b><small>→ then plant again</small></span><span class="vl">—</span></div>`;
+      <div class="row"><span class="ic">↺</span><span class="tx"><b>Check the link</b><small>→ then plant again</small></span><span class="vl">·</span></div>`;
     return;
   }
   $('#dnaSub').textContent = dna.title ? dna.title : 'A plant grown from this site.';
   const swatches = gen.flowerCols.slice(0,3).map(c => `<i style="background:#${c.getHexString()}"></i>`).join('');
-  const fontName = (dna.families[0] || gen.healthy) ? esc((dna.families[0]||'system').replace(/\b\w/g, m=>m.toUpperCase())) : '—';
+  const fontName = (dna.families[0] || gen.healthy) ? esc((dna.families[0]||'system').replace(/\b\w/g, m=>m.toUpperCase())) : '·';
   const vigPct = Math.round(gen.vigor*100);
   const rows = [
-    ['🎨','Palette', `${dna.colors.length} colours read`, swatches || '—', 'blooms &amp; leaf tint'],
+    ['🎨','Palette', `${dna.colors.length} colours read`, swatches || '·', 'blooms &amp; leaf tint'],
     ['🔤','Type', esc(dna.fontClass) + (dna.families.length?` · ${dna.families.length} fam`:''), '', 'leaf shape'],
     ['🌿','Elements', dna.tagCount.toLocaleString()+' tags', '', 'branchiness'],
     ['🔗','Links', dna.linkCount.toLocaleString(), '', 'leaf density'],
@@ -967,7 +967,7 @@ function makeCard(dna){
   const dots = (dna.colors || []).slice(0, 5)
     .map(c => `<i style="background:${/^#[0-9a-f]{6}$/i.test(c.hex || '') ? c.hex : '#9aa'}"></i>`).join('');
   el.innerHTML = `<span class="g-thumb"><span class="g-shim"></span></span>
-    <span class="g-meta"><b class="g-host">${esc(dna.host || '—')}</b>
+    <span class="g-meta"><b class="g-host">${esc(dna.host || '·')}</b>
     <span class="g-dots">${dots}</span><span class="g-stat">${esc(fmtStat(dna))}</span></span>`;
   const pick = () => pickFromGarden(dna);
   el.addEventListener('click', pick);
@@ -1016,7 +1016,7 @@ async function openGarden(){
     $('#gardenCount').textContent = '';
     empty.hidden = false;
     empty.textContent = data === null
-      ? 'The shared garden lives on the deployed site — grow one there.'
+      ? 'The shared garden lives on the deployed site. Grow one there.'
       : 'No plants yet. Be the first to grow one.';
     return;
   }
