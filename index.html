@@ -73,7 +73,9 @@
     font-size:12.5px; padding:6px 12px; border-radius:999px; cursor:pointer; transition:all .15s ease; font-family:var(--sans)}
   .chip:hover{border-color:var(--moss); color:var(--moss); background:#fff}
   .err{color:#b4533b; font-size:12.5px; margin-top:12px; min-height:1em; transition:opacity .2s}
-  .privacy{margin-top:16px; font-size:11px; color:var(--ink-faint); line-height:1.4}
+  .visitors{margin:16px 0 0; font-size:12px; color:var(--ink-soft); letter-spacing:.01em}
+  .visitors b{color:var(--moss-deep); font-weight:600}
+  .privacy{margin-top:10px; font-size:11px; color:var(--ink-faint); line-height:1.4}
 
   /* ---- germination loader ---- */
   .germ{display:none; flex-direction:column; align-items:center; gap:18px}
@@ -217,6 +219,7 @@
 <!-- footer -->
 <div class="bar" id="bar">
   <button class="again" id="again"><span>↺</span> plant another</button>
+  <button class="again" id="saveBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg> save image</button>
   <button class="again" id="gardenBtn"><span class="leaf-dot sm"></span> the garden</button>
   <span class="hint">drag to look around · scroll to zoom</span>
 </div>
@@ -243,6 +246,7 @@
       </div>
       <div class="err" id="err"></div>
       <button class="ghostlink" id="gardenLink" type="button">or wander the shared garden →</button>
+      <p class="visitors" id="visitors" hidden></p>
       <p class="privacy">We read a site's public markup once to grow it. Your plant joins the shared garden — only public traits, nothing personal.</p>
     </div>
 
@@ -435,7 +439,7 @@ scene.background = gradientTex([[0,'#f7f0e3'],[0.5,'#eef0e0'],[1,'#cfdec8']]);
 const camera = new THREE.PerspectiveCamera(40, innerWidth/innerHeight, 0.1, 200);
 camera.position.set(0.2, 2.4, 8.4);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -761,7 +765,9 @@ function renderLegend(dna, gen){
 
 // build + legend + start the growth animation from a DNA object (shared by the
 // live-plant flow and by picking a plant out of the garden)
+let currentDNA = null;
 function growFromDNA(dna){
+  currentDNA = dna;
   clearPlant();
   const gen = genetics(dna);
   const stats = buildPlant(gen);
@@ -969,6 +975,91 @@ $('#gardenBtn').addEventListener('click', openGarden);
 $('#gardenLink').addEventListener('click', openGarden);
 $('#gardenClose').addEventListener('click', closeGarden);
 addEventListener('keydown', (e) => { if (e.key === 'Escape') closeGarden(); });
+
+/* ============================================================ save image */
+const saveBtn = $('#saveBtn');
+function roundRect(g, x, y, w, h, r){ g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+// render the live scene straight-on into a portrait frame, then restore instantly
+function exportShot(){
+  const W = 1080, H = 1350;
+  const pos = camera.position.clone(), quat = camera.quaternion.clone(), asp = camera.aspect, fov = camera.fov;
+  camera.aspect = W / H; camera.fov = 34;
+  camera.position.set(0, 2.05, 10.6); camera.lookAt(0, 2.0, 0); camera.updateProjectionMatrix();
+  renderer.setSize(W, H, false); composer.setSize(W, H);
+  composer.render();
+  const shot = renderer.domElement.toDataURL('image/png');
+  camera.position.copy(pos); camera.quaternion.copy(quat); camera.aspect = asp; camera.fov = fov; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight, false); composer.setSize(innerWidth, innerHeight);
+  composer.render();                                   // restore live view (synchronous → no flash)
+  return { shot, W, H };
+}
+async function compositeImage(){
+  const dna = currentDNA || {};
+  const { shot, W, H } = exportShot();
+  try { await document.fonts.load('500 60px Fraunces'); await document.fonts.load('500 24px Inter'); } catch {}
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  const img = new Image(); img.src = shot; await (img.decode ? img.decode() : new Promise(r => { img.onload = r; }));
+  g.drawImage(img, 0, 0, W, H);
+  // wordmark, top-left
+  g.fillStyle = '#3f7d4e'; g.beginPath(); g.arc(58, 62, 6, 0, 7); g.fill();
+  g.fillStyle = '#28342a'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  g.font = '500 30px Fraunces, Georgia, serif'; g.fillText('terrarium', 74, 72);
+  // bottom caption panel (faded cream so text always reads)
+  const grd = g.createLinearGradient(0, H - 260, 0, H);
+  grd.addColorStop(0, 'rgba(246,239,226,0)'); grd.addColorStop(0.42, 'rgba(246,239,226,0.93)'); grd.addColorStop(1, 'rgba(243,237,222,0.98)');
+  g.fillStyle = grd; g.fillRect(0, H - 260, W, 260);
+  g.textAlign = 'center';
+  const cols = (dna.colors || []).map(x => x && x.hex).filter(h => /^#[0-9a-f]{6}$/i.test(h || '')).slice(0, 5);
+  const sw = 22, gap = 9, tw = cols.length * sw + (cols.length - 1) * gap; let sx = W / 2 - tw / 2;
+  cols.forEach(hex => { g.fillStyle = hex; roundRect(g, sx, H - 172, sw, sw, 6); g.fill(); sx += sw + gap; });
+  g.fillStyle = '#28342a'; g.font = '500 58px Fraunces, Georgia, serif';
+  g.fillText(dna.host || 'a website', W / 2, H - 98);
+  const ms = dna.ms >= 1000 ? (dna.ms / 1000).toFixed(1) + 's' : (dna.ms || 0) + 'ms';
+  g.fillStyle = '#5b6b5c'; g.font = '500 24px Inter, system-ui, sans-serif';
+  g.fillText(`${(dna.tagCount || 0).toLocaleString()} elements · ${ms} · ${dna.https ? 'secure' : 'http'}`, W / 2, H - 56);
+  g.fillStyle = '#8a9a8b'; g.font = '400 19px Inter, system-ui, sans-serif';
+  g.fillText('grown from its DNA · terrarium-mu.vercel.app', W / 2, H - 28);
+  return c;
+}
+async function downloadImage(){
+  if (!currentDNA) return;
+  const label = saveBtn.innerHTML; saveBtn.disabled = true; saveBtn.textContent = 'rendering…';
+  try {
+    const canvas = await compositeImage();
+    await new Promise(res => canvas.toBlob(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'terrarium-' + String(currentDNA.host || 'plant').replace(/[^a-z0-9.-]/gi, '_') + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000); res();
+    }, 'image/png'));
+  } catch {}
+  saveBtn.disabled = false; saveBtn.innerHTML = label;
+}
+saveBtn.addEventListener('click', downloadImage);
+
+/* ============================================================ visit count */
+async function pingViews(){
+  try {
+    let count;
+    if (!sessionStorage.getItem('terrariumViewed')){
+      sessionStorage.setItem('terrariumViewed', '1');
+      count = (await (await fetch('/api/views', { method: 'POST' })).json()).count;
+    } else {
+      count = (await (await fetch('/api/views')).json()).count;
+    }
+    let plants = 0;
+    try { plants = (await (await fetch('/api/garden')).json()).count || 0; } catch {}
+    if (count > 0){
+      const el = $('#visitors');
+      el.innerHTML = `<b>${count.toLocaleString()}</b> visitor${count === 1 ? '' : 's'}`
+        + (plants ? ` · <b>${plants.toLocaleString()}</b> plant${plants === 1 ? '' : 's'} grown` : '');
+      el.hidden = false;
+    }
+  } catch {}
+}
+pingViews();
 
 // focus the input on load
 requestAnimationFrame(() => { try { $('#url').focus(); } catch {} });
